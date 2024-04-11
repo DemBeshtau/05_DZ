@@ -201,3 +201,28 @@ drwxr-xr-x. 2 root root      32 May 15  2020 zpoolexport
 [root@zfs ~]# cat /otus/test/task1/file_mess/secret_message
 https://otus.ru/lessons/linux-hl/
 ```
+### 4. Скрипт конфигурирования сервера ###
+```shell
+#!/bin/bash
+
+sudo -i
+# установка репозитария zfs
+yum install -y http://download.zfsonlinux.org/epel/zfs-release.el7_8.noarch.rpm
+# импорт gpg ключей
+rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-zfsonlinux
+# установка необходимого для ПО
+yum install -y epel-release kernel-devel wget
+# для того, чтобы при установке пакета zfs собирался соответствующий модуль ядра
+# необходимо создать новую ссылку /lib/modules/`uname -r`/build на каталог сборки
+rm -f /lib/modules/`uname -r`/build
+ln -s /usr/src/kernels/* /lib/modules/`uname -r`/build
+# Смена zfs репозитария 
+yum-config-manager --disable zfs
+yum-config-manager --enable zfs-kmod
+# установка zfs
+yum install -y zfs
+# загрузка модуля ядра zfs
+modprobe zfs
+# добавление модуля ядра zfs в автозагрузку
+sudo echo "zfs" >> /etc/modules-load.d/zfs.conf
+```
