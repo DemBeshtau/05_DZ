@@ -17,34 +17,48 @@
 &ensp;&ensp;- найти зашифрованное сообщение в файле secret_message.<br/> 
 ### Исходные данные ###
 &ensp;&ensp;ПК на Linux c 8 ГБ ОЗУ или виртуальна машина с включенной Nested Virtualization.<br/>
-&ensp;&ensp;Предварительно установленное и настроенное ПО:
+&ensp;&ensp;Предварительно установленное и настроенное ПО:<br/>
 &ensp;&ensp;&ensp;Hasicorp Vagrant (https://www.vagrantup.com/downloads);<br/>
 &ensp;&ensp;&ensp;Oracle VirtualBox (https://www.virtualbox.org/wiki/Linux_Downloads);<br/>
 &ensp;&ensp;Все действия проводились с использованием Vagrant 2.4.0, VirtualBox 7.0.14 из<br/>
 и образа CentOS 7 2004.01.
-
-
-# Файловые системы и LVM #
-  - На образе centos/7 - v. 1804.2:<br/>
-1. Уменьшить том под корневую директорию / до 8 GB;<br/>
-2. Выделить том под /home;<br/>
-3. Выделить том под /var - реализовать в mirror;<br/>
-4. В /home - подготовить том для снапшотов;<br/>
-5. Реализовать автомонтирование разделов /home и /var в fstab;<br/>
-6. Продемонстрировать работу со снапшотами:<br/>
-&ensp;&ensp; a. создать файлы в /home/;<br/>
-&ensp;&ensp; b. снять снэпшот;<br/>
-&ensp;&ensp; c. удалить файлы в /home/;<br/>
-&ensp;&ensp; d. восстановить содержимое /home/ со снапшота;<br/>
-### Исходные данные ###
-&ensp;&ensp;На диске /dev/sda в разделе /dev/sda3 посредством LVM реализована группа разделов VolGroup00,<br/> 
-на которой,в свою очередь, находятся логические разделы LogVol00 (37.5 GB) для размещения корня<br/> 
-исходной операционной системы и LogVol01 (1 GB) для размещения SWAP-раздела. Раздел /dev/sda2   
-является разделом для размещения /boot. Диски sdb (10 GB), sdc (2 GB), sdd (1 GB), sde (1 GB) чистые. 
 ### Ход решения ###
-1. Подготовка временного тома для корневого раздела / исходной системы:
+1. Просмотр всех имеющихся дисков виртуальной машины:
 ```shell
-pvcreate /dev/sdb
-vgcreate vg_root /dev/sdb
-lvcreate -n lv_root -l +100%FREE /dev/vg_root
+[root@zfs ~]# lsblk
+NAME   MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda      8:0    0   40G  0 disk 
+`-sda1   8:1    0   40G  0 part /
+sdb      8:16   0  512M  0 disk 
+sdc      8:32   0  512M  0 disk 
+sdd      8:48   0  512M  0 disk 
+sde      8:64   0  512M  0 disk 
+sdf      8:80   0  512M  0 disk 
+sdg      8:96   0  512M  0 disk 
+sdh      8:112  0  512M  0 disk 
+sdi      8:128  0  512M  0 disk 
 ```
+2. Подготовка пулов из двух дисков в режиме RAID 1:
+```shell
+[root@zfs ~]# zpool create tank1 /dev/sdb /dev/sdc
+[root@zfs ~]# zpool create tank2 /dev/sdd /dev/sde
+[root@zfs ~]# zpool create tank3 /dev/sdf /dev/sdg
+[root@zfs ~]# zpool create tank4 /dev/sdh /dev/sdi
+```
+3. Просмотр списка созданных пулов:
+```shell
+[root@zfs ~]# zpool list
+NAME    SIZE  ALLOC   FREE  CKPOINT  EXPANDSZ   FRAG    CAP  DEDUP    HEALTH  ALTROOT
+tank1   960M   108K   960M        -         -     0%     0%  1.00x    ONLINE  -
+tank2   960M   108K   960M        -         -     0%     0%  1.00x    ONLINE  -
+tank3   960M   108K   960M        -         -     0%     0%  1.00x    ONLINE  -
+tank4   960M   122K   960M        -         -     0%     0%  1.00x    ONLINE  -
+```
+4. Включение разных алгоритмов сжатия в каждую из фаловых систем:
+```shell
+[root@zfs ~]# zfs set compression=lzjb tank1
+[root@zfs ~]# zfs set compression=lz4 tank2
+[root@zfs ~]# zfs set compression=gzip-9 tank3
+[root@zfs ~]# zfs set compression=zle tank4
+```
+5. 
