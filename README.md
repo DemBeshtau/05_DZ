@@ -1,7 +1,7 @@
 # Технологии файловой системы ZFS #
 1. Определить алгоритм с наилучшим сжатием:<br/>
 &ensp;&ensp;- определить какие алгоритмы сжатия поддерживает zfs (gzip, zle, lzjb, lz4);<br/>
-&ensp;&ensp;- создать 4 файловые системы, на каждой применить совй алгоритм сжатия;<br/>
+&ensp;&ensp;- создать 4 файловые системы, на каждой применить свой алгоритм сжатия;<br/>
 &ensp;&ensp;- для сжатия использовать либо текстовый файл, либо группу файлов.<br/>
 2. Определить настройки пула.<br/>
 &ensp;&ensp;- С помощью команды zfs import собрать pool ZFS.<br/>
@@ -16,12 +16,12 @@
 &ensp;&ensp;- восстановить файл локально zfs receive;<br/>
 &ensp;&ensp;- найти зашифрованное сообщение в файле secret_message.<br/> 
 ### Исходные данные ###
-&ensp;&ensp;ПК на Linux c 8 ГБ ОЗУ или виртуальна машина с включенной Nested Virtualization.<br/>
+&ensp;&ensp;ПК на Linux c 8 ГБ ОЗУ или виртуальная машина с включенной Nested Virtualization.<br/>
 &ensp;&ensp;Предварительно установленное и настроенное ПО:<br/>
-&ensp;&ensp;&ensp;Hasicorp Vagrant (https://www.vagrantup.com/downloads);<br/>
+&ensp;&ensp;&ensp;Hashicorp Vagrant (https://www.vagrantup.com/downloads);<br/>
 &ensp;&ensp;&ensp;Oracle VirtualBox (https://www.virtualbox.org/wiki/Linux_Downloads);<br/>
-&ensp;&ensp;Все действия проводились с использованием Vagrant 2.4.0, VirtualBox 7.0.14 из<br/>
-и образа CentOS 7 2004.01.
+&ensp;&ensp;Все действия проводились с использованием Vagrant 2.4.0, VirtualBox 7.0.14 <br/>
+&ensp;&ensp;и образа CentOS 7 2004.01.
 ### Ход решения ###
 ### 1. Определение алгоритма с наилучшим сжатием ###
 1.1. Просмотр всех имеющихся дисков виртуальной машины:
@@ -55,14 +55,14 @@ tank2   960M   108K   960M        -         -     0%     0%  1.00x    ONLINE  -
 tank3   960M   108K   960M        -         -     0%     0%  1.00x    ONLINE  -
 tank4   960M   122K   960M        -         -     0%     0%  1.00x    ONLINE  -
 ```
-1.4. Включение разных алгоритмов сжатия в каждую из фаловых систем:
+1.4. Включение разных алгоритмов сжатия в каждую из файловых систем:
 ```shell
 [root@zfs ~]# zfs set compression=lzjb tank1
 [root@zfs ~]# zfs set compression=lz4 tank2
 [root@zfs ~]# zfs set compression=gzip-9 tank3
 [root@zfs ~]# zfs set compression=zle tank4
 ```
-1.5. Проверка наличия алгоритмов сжатия на фаловых системах:
+1.5. Проверка наличия алгоритмов сжатия на файловых системах:
 ```shell
 [root@zfs ~]# zfs get all | grep compression
 tank1  compression           lzjb                   local
@@ -142,6 +142,7 @@ zpoolexport/fileb
 ```
 2.3. Осуществление импорта скачанного пула и просмотр его состояния:
 ```shell
+[root@zfs ~]# zpool import -d zpoolexport/ otus
 [root@zfs ~]# zpool status otus
   pool: otus
  state: ONLINE
@@ -151,8 +152,52 @@ config:
 	NAME                         STATE     READ WRITE CKSUM
 	otus                         ONLINE       0     0     0
 	  mirror-0                   ONLINE       0     0     0
-	    /root/zpoolexport/filea  ONLINE       0     0     0
+	    /root/zpoolexport/filea  ONLINE       0     0     0*
 	    /root/zpoolexport/fileb  ONLINE       0     0     0
 
 errors: No known data errors
+
+[root@zfs ~]# zfs getavailable otus
+NAME  PROPERTY   VALUE  SOURCE
+otus  available  350M   -
+
+[root@zfs ~]# zfs get readonly otus
+NAME  PROPERTY  VALUE   SOURCE
+otus  readonly  off     default
+
+[root@zfs ~]# zfs get recordsize otus
+NAME  PROPERTY    VALUE    SOURCE
+otus  recordsize  128K     local
+
+[root@zfs ~]# zfs get compression otus
+NAME  PROPERTY     VALUE     SOURCE
+otus  compression  zle       local
+
+[root@zfs ~]# zfs get checksum otus
+NAME  PROPERTY  VALUE      SOURCE
+otus  checksum  sha256     local
+```
+### 3. Работа со снапшотом, поиск сообщения от преподавателя ###
+3.1. Получение файла для работы:
+```shell
+wget -O otus_task2.file --no-check-certificate https://drive.usercontent.google.com/download?id=1wgxjih8YZ-cqLqaZVa0lA3h3Y029c3oI&export=download
+[root@zfs ~]# ll
+total 12432
+-rw-------. 1 root root    5570 Apr 30  2020 anaconda-ks.cfg
+-rw-r--r--. 1 root root 7275140 Dec  6 15:49 archive.tar.gz
+-rw-------. 1 root root    5300 Apr 30  2020 original-ks.cfg
+-rw-r--r--. 1 root root 5432736 Dec  6 15:22 otus_task2.file
+drwxr-xr-x. 2 root root      32 May 15  2020 zpoolexport
+````
+3.2. Восстановление файловой системы из снапшота:
+```shell
+[root@zfs ~]# zfs receive otus/test@today < otus_task2.file 
+```
+3.3. Поиск заданного файла по имени и просмотр его содержимого:
+```shell
+[root@zfs ~]# find /otus/test -name "secret_message"
+/otus/test/task1/file_mess/secret_message
+
+[root@zfs ~]# cat /otus/test/task1/file_mess/secret_message
+https://otus.ru/lessons/linux-hl/
 ```
